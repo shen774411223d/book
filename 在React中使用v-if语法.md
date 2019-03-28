@@ -128,7 +128,7 @@
         */
     ```
     
-- 各位看官还可以看看我的 [React-demo](https://github.com/shen774411223d/React-demo) 基于React V16.x和React-Router V4.
+- 各位看官还可以看看我的 [React-demo](https://github.com/shen774411223d/React-demo) 基于React V16.x和React-Router V4.x。基本涵盖的React开发中基本功能
 - 因为babel本来就比较难懂，写的可能不是很清楚大家见谅哈～
 - 源码地址：[我的github](https://github.com/shen774411223d/book)
  
