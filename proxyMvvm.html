@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>proxy</title>
+</head>
+  <div id="app">
+    <div>{{ name }}</div>
+    <div>{{ child.name }}</div>
+    <div>{{ num }}</div>
+    <div>{{ getName }}</div>
+
+    <input class="inp" type="text" v-model="num" @click="taps" />
+    <!-- <input class="inp" type="text" v-model="count" /> -->
+  </div>
+  <script>
+    class Mvvm {
+      constructor(options) {
+        let { data, el, methods } = options;
+        this.$options = options;
+        this.$el = document.querySelector(el);
+        this.$data = data;
+        this.$methods = methods;
+        let vm = initVm.call(this);
+        initObserve.call(this, this.$data);
+        initComputed.call(this);
+        new Compile(el, vm);
+        return this.$vm;
+      }
+    }
+
+    function initComputed() {
+      let computed = this.$options.computed;
+      this.$computed = {};
+      if(!computed) return;
+      Object.keys(computed).forEach(key => {
+        this.$computed[key] = computed[key].call(this.$vm);
+        new Watcher(this.$vm, key, val => {
+          this.$computed[key] = computed[key].call(this.$vm);
+        });
+      });
+    }
+
+    function initVm() {
+      /* 
+        这一步主要是代理数据 当我访问vm.xx的时候先从vm找有没有xx如果没有就从vm.$data里寻找
+        就相当于将vm.$data上的数据代理到vm上 访问vm.$data.name === 访问 vm.name
+       */
+      this.$vm = new Proxy(this, {
+        get: (target, property, receiver) => {
+          return this[property] || this.$data[property] || this.$computed[property] || this.$methods[property];
+        },
+        set:(target, property, value, receiver) => {
+          return Reflect.set(this.$data, property, value);
+        }
+      });
+      return this.$vm;
+    }
+
+    function initObserve(data) {
+      this.$data = observe(data);
+    }
+
+    function observe(data) {
+      if(typeof data !== 'object') return data;
+      return new Observe(data);
+    }
+
+    class Observe {
+      /* 
+        实现观察者，递归监听data里的数据
+       */
+      constructor(data) {
+        this.dep = new Dep();
+        for(let key in data) {
+          data[key] = observe(data[key]);
+        }
+        return this.proxy(data);
+      }
+      proxy(data) {
+        let dep = this.dep;
+        return new Proxy(data, {
+          get(target, property, receiver) {
+            if(Dep.target) {
+              if(!dep.subs.includes(Dep.exp)) {
+                dep.addSub(Dep.exp);
+                dep.addSub(Dep.target);
+              }
+            }  
+            return Reflect.get(target, property);
+          },
+          set(target, property, value, receiver) {
+            const result = Reflect.set(target, property, observe(value));
+            dep.notify();
+            return result;
+          } 
+        });
+      }
+    }
+
+    class Compile {
+      /* 
+        编译数据
+        将data的数据渲染到页面上
+       */
+      constructor(el, vm) {
+        this.vm = vm;
+        let fragment = document.createDocumentFragment();
+        fragment.append(document.querySelector(el));
+        this.replace(fragment);
+        document.body.appendChild(fragment);
+      }
+      replace(arr) {
+        Array.from(arr.childNodes).forEach(node => {
+          const reg = /\{\{(.*?)\}\}/g;
+          let txt = node.textContent;
+          if(node.nodeType === 1) {
+            this.directives(node);
+          }
+          if(node.nodeType === 3 && reg.test(node.textContent)) {
+            let vm = this.vm;
+            updateTxt();
+            function updateTxt() {
+              const val = txt.replace(reg, (matched, arrs) => {
+                new Watcher(vm, arrs, updateTxt);
+                return arrs.split('.').map(el => el.trim()).reduce((obj, key) => {
+                  console.log(obj[key], key);
+                  return obj[key] === undefined? node.textContent : obj[key]; // 例如：去vm.makeUp.one对象拿到值
+                }, vm);
+              });
+              if(val != node.textContent) {
+                node.textContent = val;
+              }
+            }
+          }
+          if(node.childNodes && node.childNodes.length > 0) {
+            this.replace(node);
+          }
+        });  
+      }
+      directives(node) {
+        const vm = this.vm;
+        Array.prototype.slice.call(node.attributes).forEach(el => {
+          if(el.name.includes('@')) {
+            const eventName = el.name.split('@')[1];
+            node.setAttribute(`v-bind:${ eventName }`, el.value);
+            node.addEventListener(eventName, vm.$methods[el.value].bind(vm));
+          }
+          if(el.name === 'v-model') {
+            node.value = vm[el.value];
+            node.addEventListener('input', e => {
+              vm[el.value] = e.target.value;
+              console.log(vm.num, e.target.value);
+            });
+          }
+        });
+      }
+    }
+
+    class Dep {
+      /* 
+        发布订阅
+        监听setter 当触发setter会调用注册过的函数 依次调用函数
+       */
+      constructor() {
+        this.subs = [];
+      }
+      addSub(sub) {
+        this.subs.push(sub);
+      }
+      notify() {
+        this.subs.filter(fn => typeof fn !== 'string').forEach(sub => sub.update());
+      }            
+    }
+
+    class Watcher {
+      constructor(vm, exp, fn) {
+        this.fn = fn;
+        this.vm = vm;
+        this.exp = exp;
+        Dep.exp = exp;
+        Dep.target = this;
+        const arr = exp.split('.').map(el => el.trim());
+        let val = vm;
+        arr.forEach(key => {
+          val = val[key] || val;
+        });
+        Dep.target = null;
+      }
+      update() {
+        const arr = this.exp.split('.').map(el => el.trim());
+        let val = this.vm;
+        arr.forEach(key => {
+          val = val[key];
+        });
+        this.fn(val);
+      }
+    }
+
+    const Vue = new Mvvm({
+      el: '#app',
+      data: {
+        name: 'jack',
+        num: 10,
+        child: {
+          name: 'tom'
+        },
+        list: []
+      },
+      computed: {
+        getName() {
+          return this.num *10;
+        }
+      },
+      methods: {
+        taps(e) {
+          console.log(e.target.value);
+        }
+      }
+    });
+    Vue.list = {
+      name: 'koko'
+    }
+    console.log(Vue.getName);
+  </script>
+</body>
+</html>
