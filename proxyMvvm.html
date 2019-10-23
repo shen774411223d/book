@@ -46,7 +46,7 @@
     function initVm() {
       /* 
         这一步主要是代理数据 当我访问vm.xx的时候先从vm找有没有xx如果没有就从vm.$data里寻找
-        就相当于将vm.$data上的数据代理到vm上 访问vm.$data.name === 访问 vm.name
+        就相当于将vm.$data上的数据代理到vm上 访问vm.name === 访问 vm.$data.name
        */
       this.$vm = new Proxy(this, {
         get: (target, property, receiver) => {
