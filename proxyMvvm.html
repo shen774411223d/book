@@ -28,6 +28,7 @@
         initComputed.call(this);
         new Compile(el, vm);
         return this.$vm;
+        // this.$vm === vm
       }
     }
 
@@ -126,7 +127,6 @@
               const val = txt.replace(reg, (matched, arrs) => {
                 new Watcher(vm, arrs, updateTxt);
                 return arrs.split('.').map(el => el.trim()).reduce((obj, key) => {
-                  console.log(obj[key], key);
                   return obj[key] === undefined? node.textContent : obj[key]; // 例如：去vm.makeUp.one对象拿到值
                 }, vm);
               });
@@ -152,7 +152,6 @@
             node.value = vm[el.value];
             node.addEventListener('input', e => {
               vm[el.value] = e.target.value;
-              console.log(vm.num, e.target.value);
             });
           }
         });
