@@ -32,18 +32,17 @@
     - 在上述阶段中我们可以从babel入手，在babel对代码转译时我们将具有r-if属性的组件全部遍历即可达到我们想要的效果
     ```
         // 使用
-        class Demo extends Component {
-            constructor(props) {
-                super(props)
-                this.state = {
-                    show: true
-                }
-            }
-            render() {
-                return (
-                    <div r-if = { this.state.show }>hello React!</div>
-                )
-            }
+        import React, { FC, useState } from 'react'
+        const App: FC = props => {
+            const [status, setStatus] = useState<boolean>(false)
+            return (
+                <>
+                    <button onClick={setStatus(!status)}>change status</button>
+                    <div r-if={status}>
+                        hello React!
+                    </div>
+                </>
+            )
         }
     ```
     
